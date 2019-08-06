@@ -1,4 +1,4 @@
-{% set version = "0.2.0" %}
+{% set version = "0.3.0" %}
 
 package:
   name: cachy
@@ -6,7 +6,7 @@ package:
 
 source:
   url: https://pypi.io/packages/source/c/cachy/cachy-{{ version }}.tar.gz
-  sha256: b71513e5a38ce90c1280c02b7d8d6bb3fdf64666c9cc0584f2479afea097d56c
+  sha256: 186581f4ceb42a0bbe040c407da73c14092379b1e4c0e327fdb72ae4a9b269b1
 
 build:
   number: 0
