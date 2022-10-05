@@ -1,24 +1,28 @@
+{% set name = "cachy" %}
 {% set version = "0.3.0" %}
 
 package:
-  name: cachy
+  name: {{ name|lower }}
   version: {{ version }}
 
 source:
-  url: https://pypi.io/packages/source/c/cachy/cachy-{{ version }}.tar.gz
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/cachy-{{ version }}.tar.gz
   sha256: 186581f4ceb42a0bbe040c407da73c14092379b1e4c0e327fdb72ae4a9b269b1
+  patches:
+    # Do not package tests as a module.
+    - remove_tests.patch
 
 build:
-  number: 0
   noarch: python
-  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vvv "
+  script: {{ PYTHON }} -m pip install . -vv
+  number: 1
 
 requirements:
   host:
+    - python >=3.6
     - pip
-    - python
   run:
-    - python
+    - python >=3.6
 
 test:
   imports:
@@ -26,12 +30,16 @@ test:
     - cachy.contracts
     - cachy.serializers
     - cachy.stores
+  commands:
+    - pip check
+  requires:
+    - pip
 
 about:
   home: https://github.com/sdispater/cachy
   license: MIT
   license_family: MIT
-  license_file: '{{ environ["RECIPE_DIR"] }}/LICENSE'
+  license_file: LICENSE
   summary: Cachy provides a simple yet effective caching library
 
 extra:
