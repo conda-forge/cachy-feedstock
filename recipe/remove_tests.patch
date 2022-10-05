@@ -1,0 +1,882 @@
+diff --color -Naur cachy-0.3.0.orig/pyproject.toml cachy-0.3.0/pyproject.toml
+--- cachy-0.3.0.orig/pyproject.toml	2019-08-06 17:12:13.932106494 -0300
++++ cachy-0.3.0/pyproject.toml	2022-10-05 11:23:55.236220036 -0300
+@@ -13,7 +13,6 @@
+ 
+ packages = [
+     {include = "cachy"},
+-    {include = "tests", format = "sdist"},
+ ]
+ 
+ [tool.poetry.dependencies]
+diff --color -Naur cachy-0.3.0.orig/setup.py cachy-0.3.0/setup.py
+--- cachy-0.3.0.orig/setup.py	1969-12-31 21:00:00.000000000 -0300
++++ cachy-0.3.0/setup.py	2022-10-05 11:39:11.996807828 -0300
+@@ -6,8 +6,7 @@
+  'cachy.contracts',
+  'cachy.serializers',
+  'cachy.stores',
+- 'tests',
+- 'tests.stores']
++]
+ 
+ package_data = \
+ {'': ['*']}
+diff --color -Naur cachy-0.3.0.orig/tests/__init__.py cachy-0.3.0/tests/__init__.py
+--- cachy-0.3.0.orig/tests/__init__.py	2019-08-06 16:18:57.993621349 -0300
++++ cachy-0.3.0/tests/__init__.py	1969-12-31 21:00:00.000000000 -0300
+@@ -1,2 +0,0 @@
+-# -*- coding: utf-8 -*-
+-
+diff --color -Naur cachy-0.3.0.orig/tests/stores/__init__.py cachy-0.3.0/tests/stores/__init__.py
+--- cachy-0.3.0.orig/tests/stores/__init__.py	2019-08-06 16:18:57.993776082 -0300
++++ cachy-0.3.0/tests/stores/__init__.py	1969-12-31 21:00:00.000000000 -0300
+@@ -1,2 +0,0 @@
+-# -*- coding: utf-8 -*-
+-
+diff --color -Naur cachy-0.3.0.orig/tests/stores/test_dict_store.py cachy-0.3.0/tests/stores/test_dict_store.py
+--- cachy-0.3.0.orig/tests/stores/test_dict_store.py	2019-08-06 16:18:57.993954181 -0300
++++ cachy-0.3.0/tests/stores/test_dict_store.py	1969-12-31 21:00:00.000000000 -0300
+@@ -1,58 +0,0 @@
+-# -*- coding: utf-8 -*-
+-
+-from unittest import TestCase
+-from flexmock import flexmock, flexmock_teardown
+-
+-from cachy.stores import DictStore
+-
+-
+-class DictStoreTestCase(TestCase):
+-
+-    def tearDown(self):
+-        flexmock_teardown()
+-
+-    def test_items_can_be_set_and_retrieved(self):
+-        store = DictStore()
+-        store.put('foo', 'bar', 10)
+-
+-        self.assertEqual('bar', store.get('foo'))
+-
+-    def test_store_item_forever_properly_stores_in_dict(self):
+-        mock = flexmock(DictStore())
+-        mock.should_receive('put').once().with_args('foo', 'bar', 0)
+-        mock.forever('foo', 'bar')
+-
+-    def test_values_can_be_incremented(self):
+-        store = DictStore()
+-        store.put('foo', 1, 10)
+-        store.increment('foo')
+-
+-        self.assertEqual(2, store.get('foo'))
+-
+-    def test_values_can_be_decremented(self):
+-        store = DictStore()
+-        store.put('foo', 1, 10)
+-        store.decrement('foo')
+-
+-        self.assertEqual(0, store.get('foo'))
+-
+-    def test_values_can_be_removed(self):
+-        store = DictStore()
+-        store.put('foo', 'bar', 10)
+-        store.forget('foo')
+-
+-        self.assertIsNone(store.get('foo'))
+-
+-    def test_items_can_be_flushed(self):
+-        store = DictStore()
+-        store.put('foo', 'bar', 10)
+-        store.put('baz', 'boom', 10)
+-        store.flush()
+-
+-        self.assertIsNone(store.get('foo'))
+-        self.assertIsNone(store.get('baz'))
+-
+-    def test_cache_key(self):
+-        store = DictStore()
+-
+-        self.assertEqual('', store.get_prefix())
+diff --color -Naur cachy-0.3.0.orig/tests/stores/test_file_store.py cachy-0.3.0/tests/stores/test_file_store.py
+--- cachy-0.3.0.orig/tests/stores/test_file_store.py	2019-08-06 16:18:57.994093894 -0300
++++ cachy-0.3.0/tests/stores/test_file_store.py	1969-12-31 21:00:00.000000000 -0300
+@@ -1,174 +0,0 @@
+-# -*- coding: utf-8 -*-
+-
+-import glob
+-import os
+-import tempfile
+-import hashlib
+-import shutil
+-
+-from unittest import TestCase
+-from flexmock import flexmock, flexmock_teardown
+-
+-from cachy.serializers import JsonSerializer
+-from cachy.stores import FileStore
+-from cachy.utils import PY2, encode
+-
+-if PY2:
+-    import __builtin__ as builtins
+-else:
+-    import builtins
+-
+-
+-class DictStoreTestCase(TestCase):
+-
+-    def setUp(self):
+-        self._dir = os.path.join(tempfile.gettempdir(), 'cachy')
+-
+-    def tearDown(self):
+-        for e in glob.glob(os.path.join(self._dir, '*')):
+-            if os.path.isdir(e):
+-                shutil.rmtree(e)
+-
+-        flexmock_teardown()
+-
+-    def test_none_is_returned_if_file_doesnt_exist(self):
+-        mock = flexmock(os.path)
+-        mock.should_receive('exists').once().and_return(False)
+-
+-        store = FileStore(tempfile.gettempdir())
+-
+-        self.assertIsNone(store.get('foo'))
+-
+-    def test_put_creates_missing_directories(self):
+-        store = flexmock(FileStore(self._dir))
+-        sha = hashlib.sha256(encode('foo')).hexdigest()
+-        full_dir = os.path.join(
+-            self._dir,
+-            sha[0:2], sha[2:4], sha[4:6], sha[6:8],
+-            sha[8:10], sha[10:12], sha[12:14], sha[14:16]
+-        )
+-        full_path = os.path.join(full_dir, sha)
+-        store.should_receive('_create_cache_directory').once().with_args(full_path)
+-        mock = flexmock(builtins)
+-        handler = flexmock()
+-        mock.should_receive('open').once().with_args(full_path, 'wb').and_return(handler)
+-        handler.should_receive('write').once()
+-
+-        store.put('foo', '0000000000', 0)
+-
+-    def test_expired_items_return_none(self):
+-        store = flexmock(FileStore(self._dir))
+-        contents = b'0000000000' + store.serialize('bar')
+-
+-        flexmock(os.path).should_receive('exists').once().and_return(True)
+-
+-        mock = flexmock(builtins)
+-        handler = flexmock()
+-
+-        sha = hashlib.sha256(encode('foo')).hexdigest()
+-        full_dir = os.path.join(
+-            self._dir,
+-            sha[0:2], sha[2:4], sha[4:6], sha[6:8],
+-            sha[8:10], sha[10:12], sha[12:14], sha[14:16]
+-        )
+-        full_path = os.path.join(full_dir, sha)
+-
+-        mock.should_receive('open').once().with_args(full_path, 'rb').and_return(handler)
+-        handler.should_receive('read').once().and_return(contents)
+-
+-        store.should_receive('forget').once().with_args('foo')
+-
+-        store.get('foo')
+-
+-    def test_store_items_properly_store_values(self):
+-        store = flexmock(FileStore(self._dir))
+-
+-        contents = b'1111111111' + store.serialize('bar')
+-
+-        sha = hashlib.sha256(encode('foo')).hexdigest()
+-        full_dir = os.path.join(
+-            self._dir,
+-            sha[0:2], sha[2:4], sha[4:6], sha[6:8],
+-            sha[8:10], sha[10:12], sha[12:14], sha[14:16]
+-        )
+-        full_path = os.path.join(full_dir, sha)
+-
+-        store.should_receive('_expiration').with_args(10).and_return(1111111111)
+-
+-        mock = flexmock(builtins)
+-        handler = flexmock()
+-        mock.should_receive('open').once().with_args(full_path, 'wb').and_return(handler)
+-        handler.should_receive('write').once().with_args(contents)
+-
+-        store.put('foo', 'bar', 10)
+-
+-    def test_forever_store_values_with_high_timestamp(self):
+-        store = flexmock(FileStore(self._dir))
+-
+-        contents = b'9999999999' + store.serialize('bar')
+-
+-        sha = hashlib.sha256(encode('foo')).hexdigest()
+-        full_dir = os.path.join(
+-            self._dir,
+-            sha[0:2], sha[2:4], sha[4:6], sha[6:8],
+-            sha[8:10], sha[10:12], sha[12:14], sha[14:16]
+-        )
+-        full_path = os.path.join(full_dir, sha)
+-
+-        mock = flexmock(builtins)
+-        handler = flexmock()
+-        mock.should_receive('open').once().with_args(full_path, 'wb').and_return(handler)
+-        handler.should_receive('write').once().with_args(contents)
+-
+-        store.forever('foo', 'bar')
+-
+-    def test_forget_with_missing_file(self):
+-        store = FileStore(self._dir)
+-
+-        sha = hashlib.sha256(encode('foo')).hexdigest()
+-        full_dir = os.path.join(
+-            self._dir,
+-            sha[0:2], sha[2:4], sha[4:6], sha[6:8],
+-            sha[8:10], sha[10:12], sha[12:14], sha[14:16]
+-        )
+-        full_path = os.path.join(full_dir, sha)
+-
+-        mock = flexmock(os.path)
+-        mock.should_receive('exists').once().with_args(full_path).and_return(False)
+-
+-        self.assertFalse(store.forget('foo'))
+-
+-    def test_forget_removes_file(self):
+-        store = FileStore(self._dir)
+-
+-        sha = hashlib.sha256(encode('foo')).hexdigest()
+-        full_dir = os.path.join(
+-            self._dir,
+-            sha[0:2], sha[2:4], sha[4:6], sha[6:8],
+-            sha[8:10], sha[10:12], sha[12:14], sha[14:16]
+-        )
+-        full_path = os.path.join(full_dir, sha)
+-
+-        mock = flexmock(os.path)
+-        mock.should_receive('exists').once().with_args(full_path).and_return(True)
+-        flexmock(os).should_receive('remove').once().with_args(full_path)
+-
+-        self.assertTrue(store.forget('foo'))
+-
+-    def test_get_with_json_serializer(self):
+-        store = FileStore(self._dir)
+-        store.set_serializer(JsonSerializer())
+-        store.forever('foo', {'foo': 'bar'})
+-
+-        result = store.get('foo')
+-        assert result == {'foo': 'bar'}
+-
+-    def test_set_hash_type(self):
+-        store = FileStore(self._dir, hash_type='md5')
+-
+-        store.put('foo', 'bar', 10)
+-        md5 = hashlib.md5(encode('foo')).hexdigest()
+-
+-        full_dir = os.path.join(self._dir, md5[0:2], md5[2:4])
+-
+-        assert os.path.exists(full_dir)
+diff --color -Naur cachy-0.3.0.orig/tests/stores/test_memcached_store.py cachy-0.3.0/tests/stores/test_memcached_store.py
+--- cachy-0.3.0.orig/tests/stores/test_memcached_store.py	2019-08-06 16:18:57.994230985 -0300
++++ cachy-0.3.0/tests/stores/test_memcached_store.py	1969-12-31 21:00:00.000000000 -0300
+@@ -1,75 +0,0 @@
+-# -*- coding: utf-8 -*-
+-
+-import math
+-from unittest import TestCase
+-from cachy.stores import MemcachedStore
+-
+-
+-class RedisStoreTestCase(TestCase):
+-
+-    def setUp(self):
+-        self.store = MemcachedStore(['127.0.0.1:11211'], 'prefix:')
+-
+-        super(RedisStoreTestCase, self).setUp()
+-
+-    def tearDown(self):
+-        self.store._memcache.flush_all()
+-
+-    def test_get_returns_null_when_not_found(self):
+-        self.assertIsNone(self.store.get('foo'))
+-
+-    def test_value_is_returned(self):
+-        mc = self.get_memcached()
+-        mc.set('prefix:foo', 'bar')
+-
+-        self.assertEqual('bar', self.store.get('foo'))
+-
+-    def test_value_is_returned_for_numerics(self):
+-        mc = self.get_memcached()
+-        mc.set('prefix:foo', 1)
+-
+-        self.assertEqual(1, self.store.get('foo'))
+-
+-    def test_put_value_into_memcache(self):
+-        mc = self.get_memcached()
+-        self.store.put('foo', 'bar', 60)
+-
+-        self.assertEqual('bar', mc.get('prefix:foo'))
+-
+-    def test_put_numeric_value(self):
+-        mc = self.get_memcached()
+-        self.store.put('foo', 1, 60)
+-
+-        self.assertEqual(1, mc.get('prefix:foo'))
+-
+-    def test_increment(self):
+-        mc = self.get_memcached()
+-        mc.set('prefix:foo', 1, 60)
+-
+-        self.store.increment('foo', 2)
+-        self.assertEqual(3, mc.get('prefix:foo'))
+-
+-    def test_decrement(self):
+-        mc = self.get_memcached()
+-        mc.set('prefix:foo', 3, 60)
+-
+-        self.store.decrement('foo', 2)
+-        self.assertEqual(1, mc.get('prefix:foo'))
+-
+-    def test_forever(self):
+-        mc = self.get_memcached()
+-
+-        self.store.forever('foo', 'bar')
+-
+-        self.assertEqual('bar', mc.get('prefix:foo'))
+-
+-    def test_forget(self):
+-        mc = self.get_memcached()
+-        mc.set('prefix:foo', 'bar')
+-
+-        self.store.forget('foo')
+-
+-        self.assertIsNone(mc.get('prefix:foo'))
+-
+-    def get_memcached(self):
+-        return self.store._memcache
+diff --color -Naur cachy-0.3.0.orig/tests/stores/test_null_store.py cachy-0.3.0/tests/stores/test_null_store.py
+--- cachy-0.3.0.orig/tests/stores/test_null_store.py	2019-08-06 16:18:57.994341135 -0300
++++ cachy-0.3.0/tests/stores/test_null_store.py	1969-12-31 21:00:00.000000000 -0300
+@@ -1,12 +0,0 @@
+-# -*- coding: utf-8 -*-
+-
+-from unittest import TestCase
+-from cachy.stores import NullStore
+-
+-
+-class NullStoreTestCase(TestCase):
+-
+-    def test_items_cannot_be_cached(self):
+-        store = NullStore()
+-        store.put('foo', 'bar', 10)
+-        self.assertIsNone(store.get('foo'))
+diff --color -Naur cachy-0.3.0.orig/tests/stores/test_redis_store.py cachy-0.3.0/tests/stores/test_redis_store.py
+--- cachy-0.3.0.orig/tests/stores/test_redis_store.py	2019-08-06 16:57:58.550268411 -0300
++++ cachy-0.3.0/tests/stores/test_redis_store.py	1969-12-31 21:00:00.000000000 -0300
+@@ -1,77 +0,0 @@
+-# -*- coding: utf-8 -*-
+-
+-import math
+-
+-import redis
+-from unittest import TestCase
+-from flexmock import flexmock, flexmock_teardown
+-from fakeredis import FakeServer
+-from fakeredis import FakeStrictRedis
+-from cachy.stores import RedisStore
+-
+-
+-class RedisStoreTestCase(TestCase):
+-
+-    def setUp(self):
+-        server = FakeServer()
+-        server.connected = True
+-        self.store = RedisStore(
+-            prefix='prefix:', redis_class=FakeStrictRedis, server=server
+-        )
+-        self.redis = FakeStrictRedis(server=server)
+-
+-        super(RedisStoreTestCase, self).setUp()
+-
+-    def tearDown(self):
+-        flexmock_teardown()
+-        self.redis.flushdb()
+-
+-    def test_get_returns_null_when_not_found(self):
+-        self.assertIsNone(self.store.get('foo'))
+-
+-    def test_redis_value_is_returned(self):
+-        self.redis.set('prefix:foo', self.store.serialize('bar'))
+-
+-        self.assertEqual('bar', self.store.get('foo'))
+-
+-    def test_redis_value_is_returned_for_numerics(self):
+-        self.redis.set('prefix:foo', self.store.serialize(1))
+-
+-        self.assertEqual(1, self.store.get('foo'))
+-
+-    def test_put_value_into_redis(self):
+-        self.store.put('foo', 'bar', 60)
+-
+-        self.assertEqual(self.store.serialize('bar'), self.redis.get('prefix:foo'))
+-        self.assertEqual(60., round(math.ceil(float(self.redis.ttl('prefix:foo')) / 60)))
+-
+-    def test_put_numeric_value_into_redis(self):
+-        self.store.put('foo', 1, 60)
+-
+-        self.assertEqual(self.store.serialize(1), self.redis.get('prefix:foo'))
+-        self.assertEqual(60., round(math.ceil(float(self.redis.ttl('prefix:foo')) / 60)))
+-
+-    def test_increment(self):
+-        self.redis.set('prefix:foo', 1)
+-
+-        self.store.increment('foo', 2)
+-        self.assertEqual(3, int(self.redis.get('prefix:foo')))
+-
+-    def test_decrement(self):
+-        self.redis.set('prefix:foo', 3)
+-
+-        self.store.decrement('foo', 2)
+-        self.assertEqual(1, int(self.redis.get('prefix:foo')))
+-
+-    def test_forever(self):
+-        self.store.forever('foo', 'bar')
+-
+-        self.assertEqual(self.store.serialize('bar'), self.redis.get('prefix:foo'))
+-        assert self.redis.ttl('prefix:foo') == -1
+-
+-    def test_forget(self):
+-        self.redis.set('prefix:foo', 'bar')
+-
+-        self.store.forget('foo')
+-
+-        self.assertFalse(self.redis.exists('prefix:foo'))
+diff --color -Naur cachy-0.3.0.orig/tests/test_cache_manager.py cachy-0.3.0/tests/test_cache_manager.py
+--- cachy-0.3.0.orig/tests/test_cache_manager.py	2019-08-06 16:18:57.994549274 -0300
++++ cachy-0.3.0/tests/test_cache_manager.py	1969-12-31 21:00:00.000000000 -0300
+@@ -1,169 +0,0 @@
+-# -*- coding: utf-8 -*-
+-
+-import os
+-import tempfile
+-from unittest import TestCase
+-from flexmock import flexmock, flexmock_teardown
+-
+-from cachy import CacheManager, Repository
+-from cachy.stores import DictStore, FileStore
+-from cachy.contracts.store import Store
+-
+-
+-class RepositoryTestCase(TestCase):
+-
+-    def tearDown(self):
+-        flexmock_teardown()
+-
+-    def test_store_get_the_correct_store(self):
+-        cache = CacheManager({
+-            'default': 'dict',
+-            'stores': {
+-                'dict': {
+-                    'driver': 'dict'
+-                },
+-                'file': {
+-                    'driver': 'file',
+-                    'path': os.path.join(tempfile.gettempdir(), 'cachy')
+-                }
+-            }
+-        })
+-
+-        self.assertIsInstance(cache.store().get_store(), DictStore)
+-        self.assertIsInstance(cache.store('dict').get_store(), DictStore)
+-        self.assertIsInstance(cache.store('file').get_store(), FileStore)
+-
+-    def test_set_default_driver_changes_driver(self):
+-        cache = CacheManager({
+-            'default': 'dict',
+-            'stores': {
+-                'dict': {
+-                    'driver': 'dict'
+-                },
+-                'file': {
+-                    'driver': 'file',
+-                    'path': os.path.join(tempfile.gettempdir(), 'cachy')
+-                }
+-            }
+-        })
+-
+-        self.assertIsInstance(cache.store().get_store(), DictStore)
+-        cache.set_default_driver('file')
+-        self.assertIsInstance(cache.store().get_store(), FileStore)
+-
+-    def test_extend_accepts_a_callable_returning_a_store(self):
+-        cache = CacheManager({
+-            'default': 'my-driver',
+-            'stores': {
+-                'my-driver': {
+-                    'driver': 'my-driver'
+-                }
+-            }
+-        })
+-
+-        cache.extend('my-driver', lambda config: CustomStore())
+-
+-        self.assertIsInstance(cache.store().get_store(), CustomStore)
+-
+-    def test_extend_accepts_a_callable_returning_a_repository(self):
+-        cache = CacheManager({
+-            'default': 'my-driver',
+-            'stores': {
+-                'my-driver': {
+-                    'driver': 'my-driver'
+-                }
+-            }
+-        })
+-
+-        cache.extend('my-driver', lambda config: Repository(CustomStore()))
+-
+-        self.assertIsInstance(cache.store().get_store(), CustomStore)
+-
+-    def test_extend_accepts_a_store_class(self):
+-        cache = CacheManager({
+-            'default': 'my-driver',
+-            'stores': {
+-                'my-driver': {
+-                    'driver': 'my-driver'
+-                }
+-            }
+-        })
+-
+-        cache.extend('my-driver', CustomStore)
+-
+-        self.assertIsInstance(cache.store().get_store(), CustomStore)
+-
+-    def test_default_store_with_one_store(self):
+-        manager = CacheManager({
+-            'stores': {
+-                'dict': {
+-                    'driver': 'dict'
+-                }
+-            }
+-        })
+-
+-        self.assertEqual('dict', manager.get_default_driver())
+-
+-    def test_decorator(self):
+-        manager = flexmock(CacheManager({
+-            'stores': {
+-                'dict': {
+-                    'driver': 'dict'
+-                }
+-            }
+-        }))
+-
+-        store = flexmock(Repository(flexmock(CustomStore())))
+-        manager.should_receive('store').once().with_args(None).and_return(store)
+-        store.get_store().should_receive('get').and_return(None, 6, 6).one_by_one()
+-        store.get_store().should_receive('put').once()
+-
+-        calls = []
+-
+-        @manager
+-        def test(i, m=3):
+-            calls.append(i)
+-
+-            return i*3
+-
+-        test(2)
+-        test(2)
+-        test(2)
+-
+-        self.assertEqual(1, len(calls))
+-
+-    def test_full_decorator(self):
+-        manager = flexmock(CacheManager({
+-            'stores': {
+-                'dict': {
+-                    'driver': 'dict'
+-                }
+-            }
+-        }))
+-
+-        store = flexmock(Repository(flexmock(CustomStore())))
+-        store.should_receive('_get_key').with_args('my_key', (2,), {'m': 4}).and_return('foo')
+-        manager.should_receive('store').once().with_args('dict').and_return(store)
+-        store.get_store().should_receive('get').and_return(None, 6, 6).one_by_one()
+-        store.get_store().should_receive('put').once()\
+-            .with_args('foo', 6, 35)
+-
+-        calls = []
+-
+-        @manager('dict', key='my_key', minutes=35)
+-        def test(i, m=3):
+-            calls.append(i)
+-
+-            return i*3
+-
+-        test(2, m=4)
+-        test(2, m=4)
+-        test(2, m=4)
+-
+-        self.assertEqual(1, len(calls))
+-
+-
+-class CustomStore(Store):
+-
+-    def __init__(self, config=None):
+-        pass
+diff --color -Naur cachy-0.3.0.orig/tests/test_repository.py cachy-0.3.0/tests/test_repository.py
+--- cachy-0.3.0.orig/tests/test_repository.py	2019-08-06 16:18:57.994738101 -0300
++++ cachy-0.3.0/tests/test_repository.py	1969-12-31 21:00:00.000000000 -0300
+@@ -1,141 +0,0 @@
+-# -*- coding: utf-8 -*-
+-
+-import datetime
+-from unittest import TestCase
+-from flexmock import flexmock, flexmock_teardown
+-
+-from cachy import Repository
+-from cachy.contracts.store import Store
+-
+-
+-class RepositoryTestCase(TestCase):
+-
+-    def tearDown(self):
+-        flexmock_teardown()
+-
+-    def test_get_returns_value_from_cache(self):
+-        repo = self._get_repository()
+-        repo.get_store().should_receive('get').once().with_args('foo').and_return('bar')
+-
+-        self.assertEqual('bar', repo.get('foo'))
+-
+-    def test_default_value_is_returned(self):
+-        repo = self._get_repository()
+-        repo.get_store().should_receive('get').and_return(None)
+-
+-        self.assertEqual('bar', repo.get('foo', 'bar'))
+-        self.assertEqual('baz', repo.get('foo', lambda: 'baz'))
+-
+-    def test_set_default_cache_time(self):
+-        repo = self._get_repository()
+-        repo.set_default_cache_time(10)
+-
+-        self.assertEqual(10, repo.get_default_cache_time())
+-
+-    def test_has_method(self):
+-        repo = self._get_repository()
+-        repo.get_store().should_receive('get').with_args('foo').and_return(None)
+-        repo.get_store().should_receive('get').with_args('bar').and_return('baz')
+-
+-        self.assertFalse(repo.has('foo'))
+-        self.assertTrue(repo.has('bar'))
+-
+-    def test_pull(self):
+-        repo = self._get_repository()
+-        repo.get_store().should_receive('get').with_args('foo').and_return('bar')
+-        repo.get_store().should_receive('forget').with_args('foo')
+-
+-        self.assertEqual('bar', repo.get('foo'))
+-
+-    def test_put(self):
+-        repo = self._get_repository()
+-        repo.get_store().should_receive('put').with_args('foo', 'bar', 10)
+-
+-        repo.put('foo', 'bar', 10)
+-
+-    def test_put_supports_datetime_as_minutes(self):
+-        repo = self._get_repository()
+-        repo.get_store().should_receive('put').with_args('foo', 'bar', 60)
+-
+-        repo.put('foo', 'bar', datetime.datetime.now() + datetime.timedelta(hours=1))
+-
+-    def test_put_with_minutes_to_zero_doesnt_store(self):
+-        repo = self._get_repository()
+-        repo.get_store().should_receive('put').never()
+-
+-        repo.put('foo', 'bar', datetime.datetime.now() - datetime.timedelta(hours=1))
+-
+-    def test_add(self):
+-        repo = self._get_repository()
+-        repo.get_store().should_receive('get').once().with_args('foo').and_return(None)
+-        repo.get_store().should_receive('get').once().with_args('bar').and_return('baz')
+-        repo.get_store().should_receive('put').once().with_args('foo', 'bar', 10)
+-        repo.get_store().should_receive('put').never().with_args('bar', 'baz', 10)
+-
+-        self.assertTrue(repo.add('foo', 'bar', 10))
+-        self.assertFalse(repo.add('bar', 'baz', 10))
+-
+-    def test_forever(self):
+-        repo = self._get_repository()
+-        repo.get_store().should_receive('forever').once().with_args('foo', 'bar')
+-
+-        repo.forever('foo', 'bar')
+-
+-    def test_remember_calls_put_and_returns_default(self):
+-        repo = self._get_repository()
+-        repo.get_store().should_receive('get').and_return(None)
+-        repo.get_store().should_receive('put').once().with_args('foo', 'bar', 10)
+-        result = repo.remember('foo', 10, lambda: 'bar')
+-
+-        self.assertEqual('bar', result)
+-
+-    def test_remember_forever_calls_forever_and_returns_default(self):
+-        repo = self._get_repository()
+-        repo.get_store().should_receive('get').and_return(None)
+-        repo.get_store().should_receive('forever').once().with_args('foo', 'bar')
+-        result = repo.remember_forever('foo', lambda: 'bar')
+-
+-        self.assertEqual('bar', result)
+-
+-    def test_repository_can_serve_as_a_decorator(self):
+-        repo = self._get_repository()
+-        repo.get_store().should_receive('get').and_return(None, 6, 6).one_by_one()
+-        repo.get_store().should_receive('put').once()
+-        calls = []
+-
+-        @repo
+-        def test(i, m=3):
+-            calls.append(i)
+-
+-            return i*3
+-
+-        test(2)
+-        test(2)
+-        test(2)
+-
+-        self.assertEqual(1, len(calls))
+-
+-    def test_repository_can_serve_as_a_decorator_with_key_and_minutes(self):
+-        repo = flexmock(self._get_repository())
+-        repo.should_receive('_get_key').with_args('my_key', (2,), {'m': 4}).and_return('foo')
+-        repo.get_store().should_receive('get').and_return(None, 6, 6).one_by_one()
+-        repo.get_store().should_receive('put').once()\
+-            .with_args('foo', 6, 35)
+-        calls = []
+-
+-        @repo(key='my_key', minutes=35)
+-        def test(i, m=3):
+-            calls.append(i)
+-
+-            return i*3
+-
+-        test(2, m=4)
+-        test(2, m=4)
+-        test(2, m=4)
+-
+-        self.assertEqual(1, len(calls))
+-
+-    def _get_repository(self):
+-        repo = Repository(flexmock(Store()))
+-
+-        return repo
+diff --color -Naur cachy-0.3.0.orig/tests/test_tagged_cache.py cachy-0.3.0/tests/test_tagged_cache.py
+--- cachy-0.3.0.orig/tests/test_tagged_cache.py	2019-08-06 16:18:57.994858264 -0300
++++ cachy-0.3.0/tests/test_tagged_cache.py	1969-12-31 21:00:00.000000000 -0300
+@@ -1,108 +0,0 @@
+-# -*- coding: utf-8 -*-
+-
+-import hashlib
+-from unittest import TestCase
+-from fakeredis import FakeStrictRedis
+-from cachy.stores import DictStore, RedisStore
+-from cachy.tag_set import TagSet
+-from cachy.redis_tagged_cache import RedisTaggedCache
+-from datetime import datetime, timedelta
+-from flexmock import flexmock, flexmock_teardown
+-
+-
+-class TaggedCacheTestCase(TestCase):
+-
+-    def tearDown(self):
+-        flexmock_teardown()
+-
+-    def test_tags_can_be_flushed(self):
+-        store = DictStore()
+-
+-        store.tags('bop').put('foo', 'bar', 10)
+-        store.tags('zap').put('baz', 'boom', 10)
+-        store.tags('bop').flush()
+-
+-        self.assertIsNone(store.tags('bop').get('foo'))
+-        self.assertEqual('boom', store.tags('zap').get('baz'))
+-
+-    def test_cache_can_be_saved_with_multiple_tags(self):
+-        store = DictStore()
+-
+-        tags = ['bop', 'zap']
+-        store.tags(*tags).put('foo', 'bar', 10)
+-        self.assertEqual('bar', store.tags(tags).get('foo'))
+-
+-    def test_cache_can_be_set_with_datetime(self):
+-        store = DictStore()
+-        duration = datetime.now() + timedelta(minutes=10)
+-
+-        store.tags('bop').put('foo', 'bar', duration)
+-
+-        self.assertEqual('bar', store.tags('bop').get('foo'))
+-
+-    def test_cache_saved_with_multiple_tags_can_be_flushed(self):
+-        store = DictStore()
+-
+-        tags = ['bop', 'zap']
+-        store.tags(*tags).put('foo', 'bar', 10)
+-        tags2 = ['bam', 'pow']
+-        store.tags(*tags2).put('foo', 'bar', 10)
+-        store.tags('zap').flush()
+-
+-        self.assertIsNone(store.tags(tags).get('foo'))
+-        self.assertEqual('bar', store.tags(tags2).get('foo'))
+-
+-    def test_tags_cache_forever(self):
+-        store = DictStore()
+-
+-        tags = ['bop', 'zap']
+-        store.tags(*tags).forever('foo', 'bar')
+-
+-        self.assertEqual('bar', store.tags(tags).get('foo'))
+-
+-    def test_redis_cache_tags_push_forever_keys_correctly(self):
+-        store = flexmock(RedisStore(redis_class=FakeStrictRedis))
+-        tag_set = flexmock(TagSet(store, ['foo', 'bar']))
+-
+-        tag_set.should_receive('get_namespace').and_return('foo|bar')
+-        redis = RedisTaggedCache(store, tag_set)
+-
+-        store.should_receive('get_prefix').and_return('prefix:')
+-        conn = flexmock()
+-        store.should_receive('connection').and_return(conn)
+-        conn.should_receive('lpush').once()\
+-            .with_args('prefix:foo:forever', 'prefix:%s:key1' % hashlib.sha1(b'foo|bar').hexdigest())
+-        conn.should_receive('lpush').once()\
+-            .with_args('prefix:bar:forever', 'prefix:%s:key1' % hashlib.sha1(b'foo|bar').hexdigest())
+-
+-        store.should_receive('forever').with_args(hashlib.sha1(b'foo|bar').hexdigest() + ':key1', 'key1:value')
+-
+-        redis.forever('key1', 'key1:value')
+-
+-    def test_redis_cache_forever_tags_can_be_flushed(self):
+-        store = flexmock(RedisStore(redis_class=FakeStrictRedis))
+-        tag_set = flexmock(TagSet(store, ['foo', 'bar']))
+-
+-        tag_set.should_receive('get_namespace').and_return('foo|bar')
+-        redis = RedisTaggedCache(store, tag_set)
+-
+-        store.should_receive('get_prefix').and_return('prefix:')
+-        conn = flexmock()
+-        store.should_receive('connection').and_return(conn)
+-
+-        conn.should_receive('lrange').once()\
+-            .with_args('prefix:foo:forever', 0, -1)\
+-            .and_return(['key1', 'key2'])
+-        conn.should_receive('lrange').once()\
+-            .with_args('prefix:bar:forever', 0, -1)\
+-            .and_return(['key3'])
+-
+-        conn.should_receive('delete').once().with_args('key1', 'key2')
+-        conn.should_receive('delete').once().with_args('key3')
+-        conn.should_receive('delete').once().with_args('prefix:foo:forever')
+-        conn.should_receive('delete').once().with_args('prefix:bar:forever')
+-
+-        tag_set.should_receive('reset').once()
+-
+-        redis.flush()
+-
